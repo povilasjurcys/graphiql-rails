@@ -4,6 +4,30 @@ document.addEventListener("DOMContentLoaded", function(event) {
 
   var queryParams = graphiqlContainer.dataset.queryParams;
 
+  function authorizationHeadersLocalStore() {
+    var tokenValue = localStorage.getItem('token')
+
+    return {
+      Authorization: 'Token ' + tokenValue
+    }
+  }
+
+  function onEditQuery(newQuery) {
+    parameters.query = newQuery;
+    updateURL();
+  }
+  function onEditVariables(newVariables) {
+    parameters.variables = newVariables;
+    updateURL();
+  }
+  function updateURL() {
+    var newSearch = '?' + Object.keys(parameters).map(function (key) {
+      return encodeURIComponent(key) + '=' +
+        encodeURIComponent(parameters[key]);
+    }).join('&');
+    history.replaceState(null, null, newSearch);
+  }
+
   if (queryParams === 'true') {
     // Parse the search string to get url parameters.
     var search = window.location.search;
@@ -26,31 +50,21 @@ document.addEventListener("DOMContentLoaded", function(event) {
     }
     // When the query and variables string is edited, update the URL bar so
     // that it can be easily shared
-    function onEditQuery(newQuery) {
-      parameters.query = newQuery;
-      updateURL();
-    }
-    function onEditVariables(newVariables) {
-      parameters.variables = newVariables;
-      updateURL();
-    }
-    function updateURL() {
-      var newSearch = '?' + Object.keys(parameters).map(function (key) {
-        return encodeURIComponent(key) + '=' +
-          encodeURIComponent(parameters[key]);
-      }).join('&');
-      history.replaceState(null, null, newSearch);
-    }
-
   }
 
 
   // Defines a GraphQL fetcher using the fetch API.
   var graphQLEndpoint = graphiqlContainer.dataset.graphqlEndpointPath;
   function graphQLFetcher(graphQLParams) {
+    var headers = Object.assign(
+      {},
+      JSON.parse(graphiqlContainer.dataset.headers),
+      authorizationHeadersLocalStore()
+    )
+
     return fetch(graphQLEndpoint, {
       method: 'post',
-      headers: JSON.parse(graphiqlContainer.dataset.headers),
+      headers: headers,
       body: JSON.stringify(graphQLParams),
       credentials: 'include',
     }).then(function(response) {
@@ -76,14 +90,14 @@ document.addEventListener("DOMContentLoaded", function(event) {
 
 
   // Render <GraphiQL /> into the body.
-  var element_props = { fetcher: graphQLFetcher, defaultQuery: defaultQuery };
-
+  var elementProps = { fetcher: graphQLFetcher, defaultQuery: defaultQuery, };
+  Object.assign(elementProps, { query: parameters.query, variables: parameters.variables })
   if (queryParams === 'true') {
-    queryParams = Object.assign({}, queryParams, { query: parameters.query, variables: parameters.variables, onEditQuery: onEditQuery, onEditVariables: onEditVariables });
+    Object.assign(elementProps, { onEditQuery: onEditQuery, onEditVariables: onEditVariables });
   }
 
   ReactDOM.render(
-    React.createElement(GraphiQL, element_props,
+    React.createElement(GraphiQL, elementProps,
       React.createElement(GraphiQL.Logo, {}, graphiqlContainer.dataset.logo)
     ),
     document.getElementById("graphiql-container")
